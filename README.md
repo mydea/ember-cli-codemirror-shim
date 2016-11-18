@@ -25,3 +25,10 @@ This README outlines the details of collaborating on this Ember addon.
 * `ember build`
 
 For more information on using ember-cli, visit [http://ember-cli.com/](http://ember-cli.com/).
+
+
+### TODO
+
+- [] Options for themes && modes
+- [] Import themes && modes
+- [] Fastboot compatability
