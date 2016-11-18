@@ -40,7 +40,9 @@
     "loader.js": "^4.0.10"
   },
   "keywords": [
-    "ember-addon"
+    "ember-addon",
+    "codemirror",
+    "shim"
   ],
   "dependencies": {
     "broccoli-funnel": "^1.0.9",

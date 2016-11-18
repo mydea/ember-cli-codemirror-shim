@@ -1,3 +1,5 @@
+'use strict';
+
 const path = require('path');
 const Funnel = require('broccoli-funnel');
 const mergeTrees = require('broccoli-merge-trees');
@@ -49,11 +51,30 @@ module.exports = {
       throw new Error('Application instance must be passed to import');
     }
 
-    let vendor = this.treePaths.vendor;
+    const vendor = this.treePaths.vendor;
+    const options = this.codemirrorOptions;
+    const modes = options.modes || [];
+    const keyMaps = options.keyMaps || [];
+    const themes = options.themes || [];
 
     // Import Dependencies
     app.import(`${vendor}/codemirror/codemirror.js`);
     app.import(`${vendor}/codemirror/codemirror.css`);
+
+    app.import(`${vendor}/codemirror/addon/mode/simple.js`);
+    app.import(`${vendor}/codemirror/addon/mode/multiplex.js`);
+
+    modes.forEach(function(mode) {
+      app.import(`${vendor}/codemirror/mode/${mode}/${mode}.js`);
+    });
+
+    keyMaps.forEach(function(keyMap) {
+      app.import(`${vendor}/codemirror/keymap/${keyMap}.js`);
+    });
+
+    themes.forEach(function(theme) {
+      app.import(`${vendor}/codemirror/keymap/${theme}.css`);
+    });
 
     // Super important magic
     app.import(`${vendor}/ember-cli-codemirror-shim/shim.js`, {
@@ -97,8 +118,13 @@ module.exports = {
    * @return {Array} Whatever mergeTrees returns
    */
   treeForVendor: function(vendorTree) {
-    var trees = [];
-    var options = this.codemirrorOptions;
+    const trees = [];
+    const options = this.codemirrorOptions;
+    let modes, keyMaps, themes;
+
+    if (options.modes) { modes = options.modes.map(function(mode) { return `${mode}/${mode}.js`; }); }
+    if (options.keyMaps) { keyMaps = options.keyMaps.map(function(keyMap) { return `${keyMap}.js`; }); }
+    if (options.themes) { themes = options.themes.map(function(theme) { return `${theme}.css`; }); }
 
     if (vendorTree) {
       trees.push(vendorTree);
@@ -108,6 +134,32 @@ module.exports = {
       destDir: 'codemirror',
       include: [new RegExp(/\.js$/), new RegExp(/\.css$/)]
     }));
+
+    trees.push(new Funnel(path.join(options.codemirrorPath, '..', 'addon', 'mode'), {
+      destDir: 'codemirror/addon/mode',
+      include: ['simple.js', 'multiplex.js']
+    }));
+
+    if (modes) {
+      trees.push(new Funnel(path.join(options.codemirrorPath, '..', 'mode'), {
+        destDir: 'codemirror/mode',
+        include: modes
+      }));
+    }
+
+    if (keyMaps) {
+      trees.push(new Funnel(path.join(options.codemirrorPath, '..', 'keymap'), {
+        destDir: 'codemirror/keymap',
+        include: keyMaps
+      }));
+    }
+
+    if (themes) {
+      trees.push(new Funnel(path.join(options.codemirrorPath, '..', 'theme'), {
+        destDir: 'codemirror/theme',
+        include: themes
+      }));
+    }
 
     return mergeTrees(trees);
   }
