@@ -15,7 +15,7 @@ const mergeTrees = require('broccoli-merge-trees');
  * - included
  *
  * `treeForVendor` Pulls the required files from the node_modules directory into
- * the consuming applications /vendor dir. The `included` hook then calls
+ * the consuming applications `/vendor` dir. The `included` hook then calls
  * `app.import` on behalf of the parent application to pull those files into
  * the consuming app.
  */
@@ -28,21 +28,23 @@ module.exports = {
   /**
    * Handle getting the codemirror configs from the consuming app and merging
    * in the codemirror npm module path
+   * @method _getConfig
    * @return {Object} Application codemirror configurations
    */
   _getConfig: function() {
-    let projectConfig = ((this.project.config(process.env.EMBER_ENV) || {}).codemirror || {});
+    let codemirrorConfig = ((this.project.config(process.env.EMBER_ENV) || {}).codemirror || {});
     let codemirrorPath = path.dirname(require.resolve('codemirror')); // MAGIC!
 
-    let config = Object.assign(projectConfig, {
-      codemirrorPath: codemirrorPath
-    });
+    codemirrorConfig.codemirrorPath = codemirrorPath;
 
-    return config;
+    return codemirrorConfig;
   },
 
   /**
-   * Handle calling app imports for codemirror assets
+   * Each theme/mode/etc needs to be imported into the consuming application
+   * to be bundled into the vendor file. This method will call `app.import` for
+   * each configured option.
+   * @method _importBrowserDependencies
    * @param {Object} app Parent application
    * @return {undefined}
    */
@@ -52,28 +54,37 @@ module.exports = {
     }
 
     const vendor = this.treePaths.vendor;
-    const options = this.codemirrorOptions;
+    const options = app.options ? app.options.codemirror : {};
     const modes = options.modes || [];
     const keyMaps = options.keyMaps || [];
     const themes = options.themes || [];
+    const addons = options.addons || [];
 
     // Import Dependencies
+    // ---------------------------------------------------------------------------
+
+    // CodeMirror Base Files
     app.import(`${vendor}/codemirror/codemirror.js`);
     app.import(`${vendor}/codemirror/codemirror.css`);
 
-    app.import(`${vendor}/codemirror/addon/mode/simple.js`);
-    app.import(`${vendor}/codemirror/addon/mode/multiplex.js`);
+    // Configured addons
+    addons.forEach(function(addon) {
+      app.import(`${vendor}/codemirror/addon/${addon}`);
+    });
 
+    // Configured modes
     modes.forEach(function(mode) {
       app.import(`${vendor}/codemirror/mode/${mode}/${mode}.js`);
     });
 
+    // Configured keymaps
     keyMaps.forEach(function(keyMap) {
       app.import(`${vendor}/codemirror/keymap/${keyMap}.js`);
     });
 
+    // Configured themes
     themes.forEach(function(theme) {
-      app.import(`${vendor}/codemirror/keymap/${theme}.css`);
+      app.import(`${vendor}/codemirror/theme/${theme}.css`);
     });
 
     // Super important magic
@@ -90,20 +101,26 @@ module.exports = {
   /**
    * Set correct references to consuming application by crawling tree. Call and
    * set codemirror configurations. Call to import dependecies.
+   *
+   * Thanks to https://github.com/jasonmit/ember-cli-moment-shim for providing
+   * a working example of shimming.
+   * @method included
    * @param {Object} app Parent app or addon
    * @return {Object} Parent application
    */
   included: function(app) {
     this._super.included.apply(this, arguments);
+    // this.ui.writeLine('Shimming codemirror');
 
     // see: https://github.com/ember-cli/ember-cli/issues/3718
     while (typeof app.import !== 'function' && app.app) {
       app = app.app;
     }
 
-    // Set resources on Addon instances
+    // Set resources on addon instance
     this.app = app;
-    this.codemirrorOptions = this._getConfig();
+    this.codemirrorConfig = this._getConfig(app);
+    this.codemirrorOptions = this.app.options ? this.app.options.codemirror : {};
 
     // Import Dependencies
     this._importBrowserDependencies(app);
@@ -114,48 +131,60 @@ module.exports = {
   /**
    * Addon treeFor[*] hook to merge codemirror into vendor tree. CLI will bundle
    * the asset into the build from there.
+   * @method treeForVendor
    * @param {Array} vendorTree Broccoli tree of vendor file probably
    * @return {Array} Whatever mergeTrees returns
    */
   treeForVendor: function(vendorTree) {
     const trees = [];
+    const config = this.codemirrorConfig;
     const options = this.codemirrorOptions;
     let modes, keyMaps, themes;
 
-    if (options.modes) { modes = options.modes.map(function(mode) { return `${mode}/${mode}.js`; }); }
-    if (options.keyMaps) { keyMaps = options.keyMaps.map(function(keyMap) { return `${keyMap}.js`; }); }
-    if (options.themes) { themes = options.themes.map(function(theme) { return `${theme}.css`; }); }
-
+    // Pull in existing vendor tree
     if (vendorTree) {
       trees.push(vendorTree);
     }
 
-    trees.push(new Funnel(options.codemirrorPath, {
+    // For each configuration, map it to match file type
+    if (options.modes) { modes = options.modes.map(function(mode) { return `${mode}/${mode}.js`; }); }
+    if (options.keyMaps) { keyMaps = options.keyMaps.map(function(keyMap) { return `${keyMap}.js`; }); }
+    if (options.themes) { themes = options.themes.map(function(theme) { return `${theme}.css`; }); }
+
+    // Don't map modes b/c the file structure is not standard, modes must be an array of filepaths
+
+    // Pull in required base files
+    // ---------------------------------------------------------------------------
+    trees.push(new Funnel(config.codemirrorPath, {
       destDir: 'codemirror',
       include: [new RegExp(/\.js$/), new RegExp(/\.css$/)]
     }));
 
-    trees.push(new Funnel(path.join(options.codemirrorPath, '..', 'addon', 'mode'), {
-      destDir: 'codemirror/addon/mode',
-      include: ['simple.js', 'multiplex.js']
-    }));
+    // Pull in configured assets to vendor tree
+    // ---------------------------------------------------------------------------
+    if (options.addons) {
+      trees.push(new Funnel(path.join(config.codemirrorPath, '..', 'addon'), {
+        destDir: 'codemirror/addon',
+        include: options.addons
+      }));
+    }
 
     if (modes) {
-      trees.push(new Funnel(path.join(options.codemirrorPath, '..', 'mode'), {
+      trees.push(new Funnel(path.join(config.codemirrorPath, '..', 'mode'), {
         destDir: 'codemirror/mode',
         include: modes
       }));
     }
 
     if (keyMaps) {
-      trees.push(new Funnel(path.join(options.codemirrorPath, '..', 'keymap'), {
+      trees.push(new Funnel(path.join(config.codemirrorPath, '..', 'keymap'), {
         destDir: 'codemirror/keymap',
         include: keyMaps
       }));
     }
 
     if (themes) {
-      trees.push(new Funnel(path.join(options.codemirrorPath, '..', 'theme'), {
+      trees.push(new Funnel(path.join(config.codemirrorPath, '..', 'theme'), {
         destDir: 'codemirror/theme',
         include: themes
       }));
