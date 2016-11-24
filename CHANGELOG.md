@@ -1,6 +1,10 @@
 # CHANGELOG
 
-# 1.1.0 (2016-11-21)
+## 1.1.1 (2016-11-24)
+Fixed:
+- Inadequate check for preexisting codemirror options from consuming application
+
+## 1.1.0 (2016-11-21)
 Added:
 - All CodeMirror assets imported can be controlled using a `codemirror` config object
 
