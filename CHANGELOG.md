@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.1.2 (2016-11-24)
+Fixed:
+- Also as well `treeFor` hook with the options
+
 ## 1.1.1 (2016-11-24)
 Fixed:
 - Inadequate check for preexisting codemirror options from consuming application

@@ -120,7 +120,7 @@ module.exports = {
     // Set resources on addon instance
     this.app = app;
     this.codemirrorConfig = this._getConfig(app);
-    this.codemirrorOptions = this.app.options ? this.app.options.codemirror : {};
+    this.codemirrorOptions = this.app.options && this.app.options.codemirror ? this.app.options.codemirror : {};
 
     // Import Dependencies
     this._importBrowserDependencies(app);
