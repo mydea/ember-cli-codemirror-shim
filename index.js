@@ -54,7 +54,7 @@ module.exports = {
     }
 
     const vendor = this.treePaths.vendor;
-    const options = app.options ? app.options.codemirror : {};
+    const options = app.options && app.options.codemirror ? app.options.codemirror : {};
     const modes = options.modes || [];
     const keyMaps = options.keyMaps || [];
     const themes = options.themes || [];
