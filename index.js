@@ -20,7 +20,7 @@ const mergeTrees = require('broccoli-merge-trees');
  * the consuming app.
  */
 module.exports = {
-  name: 'ember-cli-codemirror-shim',
+   name: require('./package').name,
 
   // Utility Methods
   // ---------------------------------------------------------------------------
